@@ -7,6 +7,15 @@
 The challenge takes the following commands:
  * `bands`: This will print directories present within the directory `./data`.
  * `songs`: This takes a directory name (`bands`) and prints files present in the directory. The function `sanitize_path` in the challenge looks for the directory traversal character `../` but you can bypass the check and do the directory traversal to the one-level-up directory by using the string `..` as a directory name. 
+ ```c
+ static bool sanitize_path(char *buffer) {
+  if (strstr(buffer, "../") != NULL) {
+    return false;
+  }
+
+  return true;
+}
+ ```
  * `open`: This opens files and stores the file descriptors in a global variable (`records`). Using `RLIMIT_NOFILE`, the application allows a maximum of 32 files to be opened at a time. The directory traversal can't be used to open the `flag` file because `open` checks if the filename contains the string "file" at `(2)`.
  ```c
  // Better safe then sorry. Make sure that the path also doesn't point to a
