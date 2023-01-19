@@ -42,16 +42,20 @@ The challenge takes the following commands:
  
 This check can be bypassed by using the limit of 32 on the file descriptor. To exploit, open 32 files (note that the last file must be the `flag` file). At `(1)`, you can see that the function opens the 33rd file descriptor to check if the file is a symbolic link or not. The function `open` will return  `-1` because the maximum allowed FD is reached. The following `if` condition turns `True` and the checks for the file `flag` is bypassed. 
  
- * `read`: This takes the index (`Record ID`) for the global array `records` from the user and reads the file stored at that index. This is used to read a file opened via the `open` commands.  At `(3)`, this command checks for the string `DrgnS` in file content before printing it to the output. The flag contains the string `DrgnS` and so the check will prevent the reading of the flag.
+ * `read`: This takes the index (`Record ID`) for the global array `records` from the user and reads the file stored at that index. This is used to read a file opened via the `open` commands.  At `(6)`, this command checks for the string `DrgnS` in file content before printing it to the output. The flag contains the string `DrgnS` and so the check will prevent the reading of the flag.
  
  ```
+  char buffer[4096];       //<----------------------------------- (3)
+  ssize_t bytes_read = read_line_buffered(globals::records[idx],
+                                          buffer, sizeof(buffer)); //<--------------- (4)
+                                          
   // Let's make sure we're not disclosing any sensitive data due to potential
   // bugs in the program.
-  if (bytes_read > 0) {
-    if (strstr(buffer, "DrgnS")) {.     // <--------(3)
+  if (bytes_read > 0) {                  //<----------------------------------- (5)
+    if (strstr(buffer, "DrgnS")) {       //<----------------------------------- (6)
       printf("[-] Attack detected and stopped!\n");
 
-      assert(close(globals::records[idx]) == 0);  //  <---------- (4)
+      assert(close(globals::records[idx]) == 0);  //<-----------------------------------  (7)
       memmove(&globals::records[idx], &globals::records[idx + 1],
               (globals::records.size() - idx - 1) * sizeof(int));
       globals::records.pop_back();
@@ -65,12 +69,12 @@ other commands such as `write`,`close`, and `exit` are available but they are no
 
 ### Exploit:
 
-The premise of the exploit is that assertions in the source code are not compiled out in the binary. The assertion at `(4)` closing the file descriptor will not occur. It means when the string `DrgnS` is found in the file content, a File descriptor is removed from the global array `records` without closing the file. 
+The premise of the exploit is that assertions in the source code are not compiled out in the binary. The assertion at `(7)` closing the file descriptor will not occur. It means when the string `DrgnS` is found in the file content, a file descriptor is removed from the global array `records` without closing the file. 
 
 The command `open` allows the maximum 16 FDs to be stored in the global array `records`. However, we can have more than 16 FDs open at a time by reading a file that contains the string "DrgnS". The binary `lyrics` contains the string and it will be used to open more than 16 FDs.
 ```c
   // Don't allow opening too many lyrics at once.
-  if (globals::records.size() >= 16) {  // <------ (5)
+  if (globals::records.size() >= 16) {  // <------ (8)
     return false;
   }
 ```
@@ -81,8 +85,8 @@ To exploit you will follow the following steps:
 * Open 12 more lyrics files to reach a total of 31 (19 +12) FDs. In my exploit, I used the lyrics file `./data/Metallica/Battery`.
 * Open the flag file as 32nd FD. 
 * Read `./data/Metallica/Battery` till the end of the file. 
-* Read the flag file. This will not print out the flag because of the check at (3).
-* Read the `./data/Metallica/Battery` file again which reached the EOF. This should print out the flag.
+* Read the flag file. This will not print out the flag because of the check at (6).
+* Read the `./data/Metallica/Battery` file again which reached the EOF. This should print out the flag because the variable `buffer` is not initialized at `(3)` and it may contain a stale value (in this case the flag). We already reached the EOF so `bytes_read` at `(4)`  is 0 and the `if` condition at `(5)` fails. This means the check of the string "DrgnS" is bypassed and the flag will be displayed.  
 
 
 
